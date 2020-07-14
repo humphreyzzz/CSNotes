@@ -80,35 +80,35 @@ select * from t1 join t2 using(ID) where t1.c=10 and t2.d=20;
 
 在有些场景下，执行器调用一次，在引擎内部则扫描了多行，因此引擎扫描行数跟rows_examined 并不是完全相同的。
 
-## MySQL的redolog和binlog
+# MySQL的redolog和binlog
 
-# redolog
+## redolog
 如果每一次的更新操作都需要写进磁盘，然后磁盘也要找到对应的那条记录，然后再更新，整个过程IO成本、查找成本都很高。为了解决这个问题，MySQL 的设计者就用了redolog提升更新效率。
 
 redolog的使用过程，其实就是 MySQL 里经常说到的WAL技术，Write-Ahead Logging，它的关键点就是先写日志，再写磁盘。
 
 具体来说，当有一条记录需要更新的时候，InnoDB 引擎就会先把记录写到 redo log里面，并更新内存，这个时候更新就算完成了。同时，InnoDB 引擎会在适当的时候，将这个操作记录更新到磁盘里面，而这个更新往往是在系统比较空闲的时候做。
 
-# binlog
+## binlog
 binlog的格式有三种：STATEMENT、ROW、MIXED 。
-## 1. STATMENT模式
+### 1. STATMENT模式
 基于SQL语句的复制(statement-based replication, SBR)，每一条会修改数据的sql语句会记录到binlog中。
 
 优点：不需要记录每一条SQL语句与每行的数据变化，这样子binlog的日志也会比较少，减少了磁盘IO，提高性能。
 
 缺点：在某些情况下会导致master-slave中的数据不一致(如sleep()函数， last_insert_id()，以及user-defined functions(udf)等会出现问题)
 
-## 2. 基于行的复制(row-based replication, RBR)
+### 2. 基于行的复制(row-based replication, RBR)
 不记录每一条SQL语句的上下文信息，仅需记录哪条数据被修改了，修改成了什么样子了。
 
 优点：不会出现某些特定情况下的存储过程、或function、或trigger的调用和触发无法被正确复制的问题。
 
 缺点：会产生大量的日志，尤其是alter table的时候会让日志暴涨。
 
-## 3. 混合模式复制(mixed-based replication, MBR)
+### 3. 混合模式复制(mixed-based replication, MBR)
 以上两种模式的混合使用，一般的复制使用STATEMENT模式保存binlog，对于STATEMENT模式无法复制的操作使用ROW模式保存binlog，MySQL会根据执行的SQL语句选择日志保存方式。
 
-# 区别
+## 区别
 1. redo log 是 InnoDB 引擎特有的；binlog 是 MySQL 的 Server 层实现的，所有引擎都可以使用。
 2. redo log 是物理日志，记录的是“在某个数据页上做了什么修改”；binlog 是逻辑日志，记录的是这个语句的原始逻辑，比如“给 ID=2 这一行的 c 字段加 1 ”。
 3. redo log 是循环写的，空间固定会用完；binlog 是可以追加写入的。“追加写”是指binlog 文件写到一定大小后会切换到下一个，并不会覆盖以前的日志。
